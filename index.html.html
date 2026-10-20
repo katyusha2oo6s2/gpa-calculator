@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPA目標計算機</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #243047;
+      --muted: #68758a;
+      --line: #dce3ed;
+      --accent: #4169d8;
+      --surface: #ffffff;
+      --bg: #f4f7fc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 28px 16px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: linear-gradient(160deg, #edf3ff 0%, var(--bg) 55%, #f8f6ff 100%);
+      min-height: 100vh;
+    }
+    main { max-width: 560px; margin: 0 auto; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 24px;
+      box-shadow: 0 12px 32px rgba(37, 57, 95, .08);
+    }
+    .eyebrow {
+      display: inline-block;
+      color: var(--accent);
+      background: #edf2ff;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: .8rem;
+      font-weight: 700;
+      letter-spacing: .03em;
+    }
+    h1 { font-size: clamp(1.55rem, 5vw, 2rem); margin: 14px 0 8px; }
+    .intro { color: var(--muted); line-height: 1.7; margin: 0 0 22px; }
+    .field { margin: 17px 0; }
+    label { display: block; font-weight: 650; margin-bottom: 7px; }
+    .hint { display: block; color: var(--muted); font-size: .82rem; margin-top: 5px; }
+    input {
+      width: 100%; border: 1px solid #cbd5e3; border-radius: 12px;
+      padding: 13px 14px; font: inherit; background: #fff; color: var(--ink);
+    }
+    input:focus { outline: 3px solid #dce6ff; border-color: var(--accent); }
+    button {
+      width: 100%; border: 0; border-radius: 12px; padding: 14px;
+      background: var(--accent); color: white; font: inherit; font-weight: 700;
+      cursor: pointer; margin-top: 8px;
+    }
+    button:hover { filter: brightness(.96); }
+    .result {
+      display: none; margin-top: 20px; border-radius: 15px; padding: 18px;
+      background: #f0f5ff; border: 1px solid #d7e3ff; line-height: 1.65;
+    }
+    .result.show { display: block; }
+    .result h2 { font-size: 1rem; margin: 0 0 8px; }
+    .score { font-size: 1.8rem; font-weight: 800; color: #244db4; overflow-wrap: anywhere; }
+    .error { background: #fff2f0; border-color: #ffd4ce; }
+    .note { color: var(--muted); font-size: .82rem; line-height: 1.6; margin: 18px 2px 0; }
+    footer { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card">
+      <span class="eyebrow">GPA PLANNER</span>
+      <h1>目標GPA計算機</h1>
+      <p class="intro">今学期、目標の累積GPAに到達するには、どのくらいの学期GPAが必要か計算します。</p>
+
+      <form id="gpa-form">
+        <div class="field">
+          <label for="current">現在の累積GPA</label>
+          <input id="current" type="number" min="0" max="4" step="any" placeholder="例：2.3" required>
+        </div>
+        <div class="field">
+          <label for="credits">現在の総履修単位数（Fを含む）</label>
+          <input id="credits" type="number" min="0" step="any" placeholder="例：40" required>
+          <span class="hint">大学のGPA計算に使う単位数を入力してください。</span>
+        </div>
+        <div class="field">
+          <label for="target">目標とする累積GPA</label>
+          <input id="target" type="number" min="0" max="4" step="any" placeholder="例：2.7" required>
+        </div>
+        <div class="field">
+          <label for="new-credits">今学期の履修単位数</label>
+          <input id="new-credits" type="number" min="0" step="any" placeholder="例：20" required>
+        </div>
+        <button type="submit">必要な学期GPAを計算</button>
+      </form>
+
+      <section id="result" class="result" aria-live="polite" role="status">
+        <h2 id="result-title">計算結果</h2>
+        <div id="result-body"></div>
+      </section>
+
+      <p class="note">※ GPAの最高値を4.0として計算しています。大学独自の算出方法（Fの扱い、単位数の数え方など）によって結果が異なる場合があります。</p>
+    </section>
+    <footer>入力した情報はこのページ内で計算され、送信されません。</footer>
+  </main>
+
+  <script>
+    const form = document.querySelector("#gpa-form");
+    const result = document.querySelector("#result");
+    const resultTitle = document.querySelector("#result-title");
+    const resultBody = document.querySelector("#result-body");
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      const a = Number(document.querySelector("#current").value);
+      const b = Number(document.querySelector("#credits").value);
+      const c = Number(document.querySelector("#target").value);
+      const d = Number(document.querySelector("#new-credits").value);
+
+      result.classList.add("show");
+      result.classList.remove("error");
+
+      if (a < 0 || a > 4 || c < 0 || c > 4 || b < 0 || d < 0) {
+        showError("GPAは0〜4、単位数は0以上の数値で入力してください。");
+        return;
+      }
+      if (d === 0) {
+        showError("今学期の履修単位数は0より大きい値を入力してください。");
+        return;
+      }
+      if (c <= a) {
+        resultTitle.textContent = "目標GPAを確認してください";
+        resultBody.textContent = "目標GPAは現在の累積GPAより高くありません。入力した目標値を確認してください。";
+        return;
+      }
+
+      const gpa = (c * (b + d) - a * b) / d;
+
+      if (gpa < 0) {
+        resultTitle.textContent = "計算結果";
+        resultBody.textContent = "この目標は、今学期のGPAが0以上であれば達成できる計算です。入力内容と大学のGPA計算方法も確認してください。";
+      } else if (gpa <= 4) {
+        resultTitle.textContent = "目標達成に必要な学期GPA";
+        const score = document.createElement("div");
+        score.className = "score";
+        score.textContent = gpa.toFixed(3);
+        resultBody.replaceChildren(score, document.createTextNode("この学期GPA以上を取ると、目標の累積GPAに届く計算です。"));
+      } else {
+        resultTitle.textContent = "今学期中の達成は難しい計算です";
+        resultBody.textContent = "必要な学期GPAは " + gpa.toFixed(3) + " です。GPAの最高値を4.0とすると、現在の履修状況では今学期中に目標を達成できません。";
+      }
+    });
+
+    function showError(message) {
+      result.classList.add("error");
+      resultTitle.textContent = "入力を確認してください";
+      resultBody.textContent = message;
+    }
+  </script>
+</body>
+</html>
